@@ -1,6 +1,9 @@
+{-# LANGUAGE GADTs, KindSignatures, RankNTypes #-}
 module Main where
 
 import Control.Applicative ((<|>))
+import Data.Kind
+import Data.Proxy (Proxy(..))
 import Data.Void (Void)
 import Text.Megaparsec (Parsec)
 import qualified Text.Megaparsec as P
@@ -15,7 +18,7 @@ main = do
     loop = do
       putStr "> "
       input <- getLine
-      case P.parse exprP "Input" input of
+      case P.parse gExprP "Input" input of
         Left err -> do
           putStrLn "ERROR"
           putStr (P.errorBundlePretty err)
@@ -23,7 +26,7 @@ main = do
           putStr "Expression: "
           print exp
           putStr "evaluated Value: "
-          print (eval exp)
+          unwrap (print . gEval)  (print . gEval) exp
       loop
 
 
@@ -59,6 +62,31 @@ eval (IfE b t e) = do
       | bBool -> eval t
       | otherwise -> eval e
     _ -> Nothing
+
+
+data GExpr (res :: Type) where
+  GIntE :: Int -> GExpr Int
+  GAddE :: GExpr Int -> GExpr Int -> GExpr Int
+  GBoolE :: Bool -> GExpr Bool
+  GIsNullE :: GExpr Int -> GExpr Bool
+  GIfE :: GExpr Bool -> GExpr res -> GExpr res -> GExpr res
+
+
+instance Show (GExpr res) where
+  show (GIntE i) = show i
+  show (GAddE a b) = "( " ++ show a ++ " ) + ( " ++ show b ++ " )"
+  show (GBoolE b) = show b
+  show (GIsNullE i) = "isNull (" ++ show i ++ ")"
+  show (GIfE b t e) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show e
+
+gEval :: GExpr res -> res
+gEval (GIntE i) = i
+gEval (GAddE a b) = gEval a + gEval b
+gEval (GBoolE b) = b
+gEval (GIsNullE i) = gEval i == 0
+gEval (GIfE b t e)
+  | gEval b = gEval t
+  | otherwise = gEval e
 
 
 type Parser = Parsec Void String
@@ -135,3 +163,84 @@ chainL1 pOp pVal = do
         val <- pVal
         more (op acc val)
       <|> pure acc
+
+
+data WrappedExpr where
+  Wrap :: ResType res -> GExpr res -> WrappedExpr
+
+instance Show WrappedExpr where
+  show = unwrap show show 
+
+data ResType a where
+  BoolRes :: ResType Bool
+  IntRes :: ResType Int
+
+
+unwrap :: (GExpr Bool -> b) -> (GExpr Int -> b) -> WrappedExpr -> b
+unwrap useBool _ (Wrap BoolRes boolExpr) = useBool boolExpr
+unwrap _ useInt (Wrap IntRes intExpr) = useInt intExpr
+
+
+unwrapMatching :: b -> (GExpr Bool -> GExpr Bool -> b) -> (GExpr Int -> GExpr Int -> b) -> WrappedExpr -> WrappedExpr -> b
+unwrapMatching _ useBools _ (Wrap BoolRes boolExpr1) (Wrap BoolRes boolExpr2) = useBools boolExpr1 boolExpr2
+unwrapMatching _ _ useInts (Wrap IntRes intExpr1) (Wrap IntRes intExpr2) = useInts intExpr1 intExpr2
+unwrapMatching elseRes _ _ _ _ = elseRes
+
+
+gExprP :: Parser WrappedExpr
+gExprP = gIfExprP <|> gTermExprP
+
+
+gIfExprP :: Parser WrappedExpr
+gIfExprP = do
+  _ <- PC.string "if" <* PC.space
+  b <- gTermExprP <* PC.space
+  unwrap rest (const $ fail "type-error Bool expected") b
+  where
+    rest :: GExpr Bool -> Parser WrappedExpr
+    rest b = do
+      _ <- PC.string "then" <* PC.space
+      t <- gTermExprP <* PC.space
+      _ <- PC.string "else" <* PC.space
+      e <- gTermExprP <* PC.space
+      unwrapMatching (fail "then and else types do not match") (\t e -> pure $ Wrap BoolRes (GIfE b t e)) (\t e -> pure $ Wrap IntRes (GIfE b t e)) t e
+
+gTermExprP :: Parser WrappedExpr
+gTermExprP = P.try gAddExprP <|> gValueExprP
+
+gAddExprP :: Parser WrappedExpr
+gAddExprP = do
+  first <- gValueExprP 
+  unwrap (const $ fail "type-error Int expected") (fmap (Wrap IntRes) . more) first
+    where
+      more :: GExpr Int -> Parser (GExpr Int)
+      more acc =
+        do
+          _ <- PC.char '+' <* P.hidden PC.space
+          next <- gValueExprP
+          unwrap (const $ fail "type-error Int expected") (more . GAddE acc) next
+        <|> pure acc
+
+
+gValueExprP :: Parser WrappedExpr
+gValueExprP = gIsNullP valueExprP' <|> valueExprP'
+    where
+      valueExprP' = P.choice
+        [ brace gExprP
+        , gIntExprP
+        , gBoolExprP
+        ]
+
+gIsNullP :: Parser WrappedExpr -> Parser WrappedExpr
+gIsNullP valP = do
+  _ <- P.label "isNull" $ P.hidden $ PC.string "isNull " <* PC.space
+  v <- valP
+  unwrap (const $ fail "type-error Int expected") unwrapInt v
+  where
+    unwrapInt intExp = pure (Wrap BoolRes $ GIsNullE intExp)
+
+gIntExprP :: Parser WrappedExpr
+gIntExprP = Wrap IntRes . GIntE <$> numberP <* PC.space
+
+gBoolExprP :: Parser WrappedExpr
+gBoolExprP = Wrap BoolRes . GBoolE <$> boolP <* PC.space
