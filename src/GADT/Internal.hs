@@ -4,7 +4,6 @@ module GADT.Internal
   , WrappedExpr (..)
   , ResType (..)
   , unwrap
-  , unwrapMatching
   ) where
 
 import Data.Kind (Type)
@@ -40,10 +39,3 @@ data ResType a where
 unwrap :: (Expr Bool -> b) -> (Expr Int -> b) -> WrappedExpr -> b
 unwrap useBool _ (Wrap BoolRes boolExpr) = useBool boolExpr
 unwrap _ useInt (Wrap IntRes intExpr) = useInt intExpr
-
-
-unwrapMatching :: b -> (Expr Bool -> Expr Bool -> b) -> (Expr Int -> Expr Int -> b) -> WrappedExpr -> WrappedExpr -> b
-unwrapMatching _ useBools _ (Wrap BoolRes boolExpr1) (Wrap BoolRes boolExpr2) = useBools boolExpr1 boolExpr2
-unwrapMatching _ _ useInts (Wrap IntRes intExpr1) (Wrap IntRes intExpr2) = useInts intExpr1 intExpr2
-unwrapMatching elseRes _ _ _ _ = elseRes
-
