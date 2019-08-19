@@ -22,60 +22,55 @@ exprP = (gIfExprP <|> gTermExprP) <* (void PC.eol <|> void P.eof)
 gIfExprP :: Parser WrappedExpr
 gIfExprP = do
   _ <- PC.string "if" <* PC.space
-  off <- P.getOffset
-  b <- gTermExprP <* PC.space
-  unwrap rest (const $ P.setOffset off >> fail "type-error Bool expected") b
+  b <- gBoolValueExprP <* PC.space
+  rest b
   where
     rest :: Expr Bool -> Parser WrappedExpr
     rest b = do
       _ <- PC.string "then" <* PC.space
       t <- gTermExprP <* PC.space
       _ <- PC.string "else" <* PC.space
-      off <- P.getOffset
-      e <- gTermExprP <* PC.space
-      unwrapMatching (P.setOffset off >> fail "then and else types do not match") (\t e -> pure $ Wrap BoolRes (IfE b t e)) (\t e -> pure $ Wrap IntRes (IfE b t e)) t e
+      unwrap (\tExpr -> gBoolValueExprP >>= \eExpr -> pure . Wrap BoolRes $ IfE b tExpr eExpr) (\tExpr -> gAddExprP >>= \eExpr -> pure . Wrap IntRes $ IfE b tExpr eExpr) t
 
 gTermExprP :: Parser WrappedExpr
-gTermExprP = gAddExprP <|> gValueExprP
+gTermExprP = (Wrap IntRes <$> gAddExprP) <|> gValueExprP
 
-gAddExprP :: Parser WrappedExpr
-gAddExprP = do
-  first <- gValueExprP 
-  unwrap (pure . Wrap BoolRes) (fmap (Wrap IntRes) . more) first
-    where
-      more :: Expr Int -> Parser (Expr Int)
-      more acc =
-        do
-          _ <- P.try $ PC.char '+' <* P.hidden PC.space
-          off <- P.getOffset
-          next <- gValueExprP
-          unwrap (const $ P.setOffset off >> fail "type-error Int expected") (more . AddE acc) next
-        <|> pure acc
-
+gAddExprP :: Parser (Expr Int)
+gAddExprP = chainL1 (pure AddE <$> PC.char '+' <* P.hidden PC.space) gIntValueExprP
 
 gValueExprP :: Parser WrappedExpr
-gValueExprP = gIsNullP valueExprP' <|> valueExprP'
+gValueExprP = (Wrap BoolRes <$> gIsNullP) <|> valueExprP'
     where
       valueExprP' = P.choice
         [ brace exprP
-        , gIntExprP
-        , gBoolExprP
+        , Wrap IntRes <$> gIntExprP
+        , Wrap BoolRes <$> gBoolExprP
         ]
 
-gIsNullP :: Parser WrappedExpr -> Parser WrappedExpr
-gIsNullP valP = do
+gIntValueExprP :: Parser (Expr Int)
+gIntValueExprP = P.choice
+  [ P.getOffset >>= (\off -> brace exprP >>= unwrap (const $ P.setOffset off >> fail "int type expected") pure)
+  , gIntExprP
+  ]
+
+gBoolValueExprP :: Parser (Expr Bool)
+gBoolValueExprP = P.choice
+  [ P.getOffset >>= (\off -> brace exprP >>= unwrap pure (const $ P.setOffset off >> fail "bool type expected"))
+  , gBoolExprP
+  , gIsNullP 
+  ]
+
+gIsNullP :: Parser (Expr Bool)
+gIsNullP = do
   _ <- P.label "isNull" $ P.hidden $ PC.string "isNull " <* PC.space
-  off <- P.getOffset
-  v <- valP
-  unwrap (const $ P.setOffset off >> fail "type-error Int expected") unwrapInt v
-  where
-    unwrapInt intExp = pure (Wrap BoolRes $ IsNullE intExp)
+  v <- gIntValueExprP
+  pure $ IsNullE v
 
-gIntExprP :: Parser WrappedExpr
-gIntExprP = Wrap IntRes . IntE <$> numberP <* PC.space
+gIntExprP :: Parser (Expr Int)
+gIntExprP = IntE <$> numberP <* PC.space
 
-gBoolExprP :: Parser WrappedExpr
-gBoolExprP = Wrap BoolRes . BoolE <$> boolP <* PC.space
+gBoolExprP :: Parser (Expr Bool)
+gBoolExprP = BoolE <$> boolP <* PC.space
 
 numberP :: Parser Int
 numberP = P.label "number" $ P.hidden $
@@ -94,3 +89,16 @@ brace p = do
   res <- p
   _ <- PC.char ')' <* P.hidden PC.space
   pure res 
+
+chainL1 :: Parser (a -> a -> a) -> Parser a -> Parser a
+chainL1 pOp pVal = do
+  first <- pVal 
+  more first
+  where
+    more acc =
+      do
+        op <- pOp
+        val <- pVal
+        more (op acc val)
+      <|> pure acc
+
