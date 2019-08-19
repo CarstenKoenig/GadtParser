@@ -12,26 +12,30 @@ import GADT.Internal
 
 
 exprP :: Parser WrappedExpr
-exprP = (gIfExprP <|> gTermExprP) <* (void PC.eol <|> void P.eof)
+exprP = exprP' <* (void PC.eol <|> void P.eof)
+
+
+exprP' :: Parser WrappedExpr
+exprP' = gIfExprP <|> gTermExprP
 
 
 gIfExprP :: Parser WrappedExpr
 gIfExprP = do
-  _ <- PC.string "if" <* PC.space
-  b <- gBoolValueExprP <* PC.space
+  _ <- PC.string "if" <* P.hidden PC.space
+  b <- gBoolValueExprP
   rest b
   where
     rest :: Expr Bool -> Parser WrappedExpr
     rest b = do
-      _ <- PC.string "then" <* PC.space
-      t <- gTermExprP <* PC.space
-      _ <- PC.string "else" <* PC.space
+      _ <- PC.string "then" <* P.hidden PC.space
+      t <- gTermExprP
+      _ <- PC.string "else" <* P.hidden PC.space
       case t of
         Wrap IntRes tExpr ->
           Wrap IntRes . IfE b tExpr <$> gAddExprP
-        Wrap BoolRes tExpr -> 
+        Wrap BoolRes tExpr ->
           Wrap BoolRes . IfE b tExpr <$> gBoolValueExprP
-         
+
 gTermExprP :: Parser WrappedExpr
 gTermExprP = (Wrap IntRes <$> gAddExprP) <|> gValueExprP
 
@@ -42,32 +46,32 @@ gValueExprP :: Parser WrappedExpr
 gValueExprP = (Wrap BoolRes <$> gIsNullP) <|> valueExprP'
     where
       valueExprP' = P.choice
-        [ brace exprP
+        [ brace exprP'
         , Wrap IntRes <$> gIntExprP
         , Wrap BoolRes <$> gBoolExprP
         ]
 
 gIntValueExprP :: Parser (Expr Int)
 gIntValueExprP = P.choice
-  [ P.getOffset >>= (\off -> brace exprP >>= unwrap (const $ P.setOffset off >> fail "int type expected") pure)
+  [ P.getOffset >>= (\off -> brace exprP' >>= unwrap (const $ P.setOffset off >> fail "int type expected") pure)
   , gIntExprP
   ]
 
 gBoolValueExprP :: Parser (Expr Bool)
 gBoolValueExprP = P.choice
-  [ P.getOffset >>= (\off -> brace exprP >>= unwrap pure (const $ P.setOffset off >> fail "bool type expected"))
+  [ P.getOffset >>= (\off -> brace exprP' >>= unwrap pure (const $ P.setOffset off >> fail "bool type expected"))
   , gBoolExprP
-  , gIsNullP 
+  , gIsNullP
   ]
 
 gIsNullP :: Parser (Expr Bool)
 gIsNullP = do
-  _ <- P.label "isNull" $ P.hidden $ PC.string "isNull " <* PC.space
+  _ <- P.label "isNull" $ P.hidden $ PC.string "isNull" <* PC.space
   v <- gIntValueExprP
   pure $ IsNullE v
 
 gIntExprP :: Parser (Expr Int)
-gIntExprP = IntE <$> numberP <* PC.space
+gIntExprP = IntE <$> numberP <* P.hidden PC.space
 
 gBoolExprP :: Parser (Expr Bool)
-gBoolExprP = BoolE <$> boolP <* PC.space
+gBoolExprP = BoolE <$> boolP <* P.hidden PC.space

@@ -14,12 +14,12 @@ exprP = ifExprP <|> termExprP
 
 ifExprP :: Parser Expr
 ifExprP = do
-  _ <- PC.string "if" <* PC.space
-  b <- termExprP <* PC.space
-  _ <- PC.string "then" <* PC.space
-  t <- termExprP <* PC.space
-  _ <- PC.string "else" <* PC.space
-  e <- termExprP <* PC.space
+  _ <- PC.string "if" <* P.hidden PC.space
+  b <- termExprP
+  _ <- PC.string "then" <* P.hidden PC.space
+  t <- termExprP
+  _ <- PC.string "else" <* P.hidden PC.space
+  e <- termExprP
   pure $ IfE b t e
 
 termExprP :: Parser Expr
@@ -41,12 +41,12 @@ valueExprP = isNullP valueExprP' <|> valueExprP'
 
 isNullP :: Parser Expr -> Parser Expr
 isNullP valP = do
-  _ <- P.label "isNull" $ P.hidden $ PC.string "isNull " <* PC.space
+  _ <- P.label "isNull" $ P.hidden $ PC.string "isNull" <* PC.space
   v <- valP
   pure $ IsNullE v
 
 intExprP :: Parser Expr
-intExprP = IntE <$> numberP <* PC.space
+intExprP = IntE <$> numberP <* P.hidden PC.space
 
 boolExprP :: Parser Expr
-boolExprP = BoolE <$> boolP <* PC.space
+boolExprP = BoolE <$> boolP <* P.hidden PC.space

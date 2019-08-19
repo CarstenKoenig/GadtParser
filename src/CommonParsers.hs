@@ -24,7 +24,7 @@ brace p = do
   _ <- PC.char '(' <* P.hidden PC.space
   res <- p
   _ <- PC.char ')' <* P.hidden PC.space
-  pure res 
+  pure res
 
 
 chainL1 :: Parser (a -> a -> a) -> Parser a -> Parser a
