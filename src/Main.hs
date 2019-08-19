@@ -13,7 +13,7 @@ main = do
     loop = do
       putStr "> "
       input <- getLine
-      case P.parse gExprP "Input" input of
+      case P.parse exprP "Input" input of
         Left err -> do
           putStrLn "ERROR"
           putStr (P.errorBundlePretty err)
@@ -21,5 +21,5 @@ main = do
           putStr "Expression: "
           print expr
           putStr "evaluated Value: "
-          unwrap (print . gEval)  (print . gEval) expr
+          print $ eval expr
       loop

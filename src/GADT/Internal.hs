@@ -1,22 +1,22 @@
 {-# LANGUAGE GADTs, KindSignatures, RankNTypes #-}
 module GADT.Internal
-  ( GExpr (..)
+  ( Expr (..)
   ) where
 
 import Data.Kind (Type)
 
 
-data GExpr (res :: Type) where
-  GIntE :: Int -> GExpr Int
-  GAddE :: GExpr Int -> GExpr Int -> GExpr Int
-  GBoolE :: Bool -> GExpr Bool
-  GIsNullE :: GExpr Int -> GExpr Bool
-  GIfE :: GExpr Bool -> GExpr res -> GExpr res -> GExpr res
+data Expr (res :: Type) where
+  IntE :: Int -> Expr Int
+  AddE :: Expr Int -> Expr Int -> Expr Int
+  BoolE :: Bool -> Expr Bool
+  IsNullE :: Expr Int -> Expr Bool
+  IfE :: Expr Bool -> Expr res -> Expr res -> Expr res
 
 
-instance Show (GExpr res) where
-  show (GIntE i) = show i
-  show (GAddE a b) = "( " ++ show a ++ " ) + ( " ++ show b ++ " )"
-  show (GBoolE b) = show b
-  show (GIsNullE i) = "isNull (" ++ show i ++ ")"
-  show (GIfE b t e) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show e
+instance Show (Expr res) where
+  show (IntE i) = show i
+  show (AddE a b) = "( " ++ show a ++ " ) + ( " ++ show b ++ " )"
+  show (BoolE b) = show b
+  show (IsNullE i) = "isNull (" ++ show i ++ ")"
+  show (IfE b t e) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show e
