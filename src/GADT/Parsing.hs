@@ -1,9 +1,6 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 module GADT.Parsing 
-  ( WrappedExpr
-  , ResType (..)
-  , unwrap
-  , exprP
+  ( exprP
   ) where
 
 import Control.Applicative ((<|>))
@@ -16,28 +13,6 @@ import GADT.Internal
 
 
 type Parser = Parsec Void String
-
-
-data WrappedExpr where
-  Wrap :: ResType res -> Expr res -> WrappedExpr
-
-instance Show WrappedExpr where
-  show = unwrap show show 
-
-data ResType a where
-  BoolRes :: ResType Bool
-  IntRes :: ResType Int
-
-
-unwrap :: (Expr Bool -> b) -> (Expr Int -> b) -> WrappedExpr -> b
-unwrap useBool _ (Wrap BoolRes boolExpr) = useBool boolExpr
-unwrap _ useInt (Wrap IntRes intExpr) = useInt intExpr
-
-
-unwrapMatching :: b -> (Expr Bool -> Expr Bool -> b) -> (Expr Int -> Expr Int -> b) -> WrappedExpr -> WrappedExpr -> b
-unwrapMatching _ useBools _ (Wrap BoolRes boolExpr1) (Wrap BoolRes boolExpr2) = useBools boolExpr1 boolExpr2
-unwrapMatching _ _ useInts (Wrap IntRes intExpr1) (Wrap IntRes intExpr2) = useInts intExpr1 intExpr2
-unwrapMatching elseRes _ _ _ _ = elseRes
 
 
 exprP :: Parser WrappedExpr
