@@ -15,6 +15,9 @@ dependencies:
   - base >= 4.7 && < 5
   - megaparsec
 
+ghc-options:
+  -Wall
+
 executables:
   GadtParser:
     source-dirs:      src
