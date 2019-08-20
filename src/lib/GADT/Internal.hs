@@ -14,70 +14,61 @@ This module defines a simple expression language with
   - 'Int'-Values
   - 'Bool'-VAlues
   - addition of two sub-expressions
-  - 'IsNullE' to check if it's subexpression is `0`
-  - an `if ... then ... else ...` conditional
+  - 'IsNullE' to check if it's subexpression is @0@
+  - an @if ... then ... else ...@ conditional
 
 Here we explore the GADT-approach where the expression-type 'Expr'
 is annotated by the type 'evalExpr' will be returning (a Haskell-Type)
 
-This guarantees that we cannot form semantically *invalid* expressions like
-`2 + false` - for example the 'AddE' constructor only accepts sub-expression
+This guarantees that we cannot form semantically __invalid__ expressions like
+@2 + false@ - for example the 'AddE' constructor only accepts sub-expression
 that will return 'Int's.
 
 This makes the 'evalExpr' function much nicer compared to it's cousin 
 'ADT.Internal.eval'.
 
 The downside is that it makes parsing harder. For example what type should
-be returned by a parser `String -> ?`
+be returned by a parser @String -> ?@
 
-`parse "5"` would need to be an `Expr Int` but `parse "false"` needs the
-type `Expr Bool` (or some variant with 'Maybe').
+@parse "5"@ would need to be an @Expr Int@ but @parse "false"@ needs the
+type @Expr Bool@ (or some variant with 'Maybe').
 
-We explore an approach where we wrap both (or really any) `Expr a` into
-an *existential*  type 'WrappedExpr' which solves this problem nicely.
-
-Now as types are erased we loose the ability to quickly check during parsing
-if the types match. For example the parser for `if` needs a way to ensure that
-both the `then` and `else` branch where parsed into the same expression-types
-in order to use the 'IfE' constructor.
-So we need a way to pass around information about the used types - which is
-the job of 'ResType' (a singleton representation of 'Int' and 'Bool') and
-the first parameter of the 'Wrap' constructor.
+We just wrap both cases into seperate constructors of 'WrappedExpr'
+which automatically gives us an run-time representation of the type
+as well which enables __intelligent__ parsing.
 
 Finally 'wrap' is used as a nice way to lift 'Expr' values into 'WrappedExpr'
-without having to manually tag the 'ResType', by using the 'KnownResType' class.
+without having to manually tag the resulting types.
 
-The 'KnownResType' class might be controversial, as you could achieve the same
-with a simple evaluater that tracks the type by walking along an expression-tree
-but this gives less boilerplate and next to no runtime cost - it's also a nice
-way to constraint the type-argument of 'Expr' to sensible values - hence the
-name.
 -}
 module GADT.Internal
   ( Expr (..)
   , WrappedExpr (..)
-  , ResType (..)
   , KnownResType(..)
   , eval
   , evalExpr
-  , unwrap
-  , wrap
   ) where
 
 import Data.Kind (Type)
 
 
+-- | AST representation of our little domain language tagged by the
+--   value-type the expression is representing (see 'evalExpr')
 data Expr (res :: Type) where
+  -- | int-value
   IntE :: Int -> Expr Int
+  -- | binary addition of two __int__-expressions
   AddE :: Expr Int -> Expr Int -> Expr Int
+  -- | bool-value
   BoolE :: Bool -> Expr Bool
+  -- | check if sub-expression of type __int__ is @0@
   IsNullE :: Expr Int -> Expr Bool
+  -- | if-expression - condition-expression has to be of type Bool,
+  --   __then__ and __else__ expression have to be the same type
   IfE :: Expr Bool -> Expr res -> Expr res -> Expr res
 
-eval :: WrappedExpr -> Maybe (Either Bool Int)
-eval = Just . unwrap (Left . evalExpr) (Right . evalExpr)
 
-
+-- | evaluates an 'Expr' to the tagged type
 evalExpr :: Expr res -> res
 evalExpr (IntE i) = i
 evalExpr (AddE a b) = evalExpr a + evalExpr b
@@ -105,38 +96,34 @@ instance Eq res => Eq (Expr res) where
   _ == _ = False
 
 
+-- | runtime representation of either an __int__ or __bool__-Expression
+--   mainly useful for parsing
 data WrappedExpr where
-  Wrap :: ResType res -> Expr res -> WrappedExpr
+  IntExpr :: Expr Int -> WrappedExpr
+  BoolExpr :: Expr Bool -> WrappedExpr
 
 instance Show WrappedExpr where
-  show = unwrap show show 
+  show (IntExpr e) = show e
+  show (BoolExpr e) = show e
 
 instance Eq WrappedExpr where
-  a == b = unwrapMatching False (==) (==) a b
+  IntExpr a == IntExpr b = a == b
+  BoolExpr a == BoolExpr b = a == b
+  _ == _ = False
 
-data ResType a where
-  BoolRes :: ResType Bool
-  IntRes :: ResType Int
+-- | evaluates an 'WrappedExpr' to either a 'Bool' or a 'Int' value
+eval :: WrappedExpr -> Either Bool Int
+eval (BoolExpr b) = Left (evalExpr b)
+eval (IntExpr i) = Right (evalExpr i)
 
-wrap :: KnownResType a => Expr a -> WrappedExpr
-wrap = Wrap getResType
 
+-- | helps wrapping 'Expr' to the right
+--   'WrappedExpr' constructor
 class KnownResType a where
-  getResType :: ResType a
+  wrap :: Expr a -> WrappedExpr
 
 instance KnownResType Int where
-  getResType = IntRes
+  wrap = IntExpr
 
 instance KnownResType Bool where
-  getResType = BoolRes
-
-
-unwrap :: (Expr Bool -> b) -> (Expr Int -> b) -> WrappedExpr -> b
-unwrap useBool _ (Wrap BoolRes boolExpr) = useBool boolExpr
-unwrap _ useInt (Wrap IntRes intExpr) = useInt intExpr
-
-
-unwrapMatching :: b -> (Expr Bool -> Expr Bool -> b) -> (Expr Int -> Expr Int -> b) -> WrappedExpr -> WrappedExpr -> b
-unwrapMatching _ useBools _ (Wrap BoolRes boolExpr1) (Wrap BoolRes boolExpr2) = useBools boolExpr1 boolExpr2
-unwrapMatching _ _ useInts (Wrap IntRes intExpr1) (Wrap IntRes intExpr2) = useInts intExpr1 intExpr2
-unwrapMatching notMatching _ _ _ _ = notMatching
+  wrap = BoolExpr

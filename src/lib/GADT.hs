@@ -4,8 +4,6 @@ module GADT
   , WrappedExpr
   , KnownResType (..)
   , eval
-  , wrap
-  , unwrap
   , exprP
   ) where
 

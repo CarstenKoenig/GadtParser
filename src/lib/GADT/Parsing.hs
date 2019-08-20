@@ -31,9 +31,9 @@ gIfExprP = do
       t <- gTermExprP
       _ <- PC.string "else" <* P.hidden PC.space
       case t of
-        Wrap IntRes tExpr ->
+        IntExpr tExpr ->
           wrap . IfE b tExpr <$> gAddExprP
-        Wrap BoolRes tExpr ->
+        BoolExpr tExpr ->
           wrap . IfE b tExpr <$> gBoolValueExprP
 
 gTermExprP :: Parser WrappedExpr
@@ -53,16 +53,22 @@ gValueExprP = (wrap <$> gIsNullP) <|> valueExprP'
 
 gIntValueExprP :: Parser (Expr Int)
 gIntValueExprP = P.choice
-  [ P.getOffset >>= (\off -> brace exprP' >>= unwrap (const $ P.setOffset off >> fail "int type expected") pure)
+  [ P.getOffset >>= (\off -> brace exprP' >>= braced off)
   , gIntExprP
   ]
+  where
+    braced _ (IntExpr i) = pure i
+    braced off (BoolExpr _) = P.setOffset off >> fail "int type expected"
 
 gBoolValueExprP :: Parser (Expr Bool)
 gBoolValueExprP = P.choice
-  [ P.getOffset >>= (\off -> brace exprP' >>= unwrap pure (const $ P.setOffset off >> fail "bool type expected"))
+  [ P.getOffset >>= (\off -> brace exprP' >>= braced off)
   , gBoolExprP
   , gIsNullP
   ]
+  where
+    braced _ (BoolExpr b) = pure b
+    braced off (IntExpr _) = P.setOffset off >> fail "bool type expected"
 
 gIsNullP :: Parser (Expr Bool)
 gIsNullP = do
