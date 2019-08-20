@@ -3,7 +3,9 @@ module GADT
   ( Expr(..)
   , WrappedExpr
   , ResType (..)
+  , KnownResType(..)
   , eval
+  , wrap
   , unwrap
   , exprP
   ) where
