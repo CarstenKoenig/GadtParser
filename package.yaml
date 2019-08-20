@@ -18,7 +18,25 @@ dependencies:
 ghc-options:
   -Wall
 
+library:
+  source-dirs:        src/lib
+
+
 executables:
   GadtParser:
-    source-dirs:      src
+    source-dirs:      src/exe
     main:             Main.hs
+    dependencies:
+      - GadtParser
+
+
+tests:
+  spec:
+    main:             Spec.hs
+    source-dirs:      test
+    dependencies:
+      - hspec
+      - GadtParser
+    verbatim:
+      build-tool-depends:
+        hspec-discover:hspec-discover == 2.*
