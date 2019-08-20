@@ -32,23 +32,23 @@ gIfExprP = do
       _ <- PC.string "else" <* P.hidden PC.space
       case t of
         Wrap IntRes tExpr ->
-          Wrap IntRes . IfE b tExpr <$> gAddExprP
+          wrap . IfE b tExpr <$> gAddExprP
         Wrap BoolRes tExpr ->
-          Wrap BoolRes . IfE b tExpr <$> gBoolValueExprP
+          wrap . IfE b tExpr <$> gBoolValueExprP
 
 gTermExprP :: Parser WrappedExpr
-gTermExprP = (Wrap IntRes <$> gAddExprP) <|> gValueExprP
+gTermExprP = (wrap <$> gAddExprP) <|> gValueExprP
 
 gAddExprP :: Parser (Expr Int)
 gAddExprP = chainL1 (pure AddE <$> PC.char '+' <* P.hidden PC.space) gIntValueExprP
 
 gValueExprP :: Parser WrappedExpr
-gValueExprP = (Wrap BoolRes <$> gIsNullP) <|> valueExprP'
+gValueExprP = (wrap <$> gIsNullP) <|> valueExprP'
     where
       valueExprP' = P.choice
         [ brace exprP'
-        , Wrap IntRes <$> gIntExprP
-        , Wrap BoolRes <$> gBoolExprP
+        , wrap <$> gIntExprP
+        , wrap <$> gBoolExprP
         ]
 
 gIntValueExprP :: Parser (Expr Int)

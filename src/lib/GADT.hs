@@ -1,9 +1,8 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 module GADT
-  ( Expr(..)
+  ( Expr (..)
   , WrappedExpr
-  , ResType (..)
-  , KnownResType(..)
+  , KnownResType (..)
   , eval
   , wrap
   , unwrap
