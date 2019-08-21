@@ -1,3 +1,12 @@
+{-|
+Module      : ADT.Parsing
+Description : "Text.Megaparsec" parser for 'ADT.Internal.Expr' expressions
+Copyright   : (c) Carsten König, 2019
+License     : GPL-3
+Maintainer  : Carsten.Koenig@hotmail.de
+Stability   : experimental
+Portability : POSIX
+-}
 module ADT.Parsing
   ( exprP
   ) where
@@ -9,6 +18,11 @@ import CommonParsers
 import ADT.Internal
 
 
+-- | defines a Megaparsec-Parser for 'Expr'
+--
+-- >>> import qualified Text.Megaparsec as P
+-- >>> P.parse exprP "" "3+4"
+-- Right (AddE (IntE 3) (IntE 4))
 exprP :: Parser Expr
 exprP = ifExprP <|> termExprP
 

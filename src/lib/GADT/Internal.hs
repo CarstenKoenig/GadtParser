@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures, RankNTypes, FlexibleInstances #-}
+{-# LANGUAGE GADTs, KindSignatures, RankNTypes, FlexibleInstances, StandaloneDeriving #-}
 
 {-|
 Module      : GADT.Internal
@@ -69,6 +69,9 @@ data Expr (res :: Type) where
 
 
 -- | evaluates an 'Expr' to the tagged type
+--
+-- >>> evalExpr (AddE (IntE 10) (IfE (BoolE False) (IntE 0) (IntE 32)))
+-- 42
 evalExpr :: Expr res -> res
 evalExpr (IntE i) = i
 evalExpr (AddE a b) = evalExpr a + evalExpr b
@@ -78,22 +81,8 @@ evalExpr (IfE b t e)
   | evalExpr b = evalExpr t
   | otherwise = evalExpr e
 
-
-instance Show (Expr res) where
-  show (IntE i) = show i
-  show (AddE a b) = "( " ++ show a ++ " ) + ( " ++ show b ++ " )"
-  show (BoolE b) = show b
-  show (IsNullE i) = "isNull (" ++ show i ++ ")"
-  show (IfE b t e) = "if " ++ show b ++ " then " ++ show t ++ " else " ++ show e
-
-
-instance Eq res => Eq (Expr res) where
-  (IntE a) == (IntE b) = a==b
-  (AddE a b) == (AddE a' b') = a==a' && b==b'
-  (BoolE a) == (BoolE b) = a==b
-  (IsNullE a) == (IsNullE b) = a==b
-  (IfE b t e) == (IfE b' t' e') = b==b' && t==t' && e==e'
-  _ == _ = False
+deriving instance Show (Expr res)
+deriving instance Eq (Expr res)
 
 
 -- | runtime representation of either an __int__ or __bool__-Expression
@@ -102,16 +91,14 @@ data WrappedExpr where
   IntExpr :: Expr Int -> WrappedExpr
   BoolExpr :: Expr Bool -> WrappedExpr
 
-instance Show WrappedExpr where
-  show (IntExpr e) = show e
-  show (BoolExpr e) = show e
+deriving instance Show WrappedExpr
+deriving instance Eq WrappedExpr
 
-instance Eq WrappedExpr where
-  IntExpr a == IntExpr b = a == b
-  BoolExpr a == BoolExpr b = a == b
-  _ == _ = False
 
 -- | evaluates an 'WrappedExpr' to either a 'Bool' or a 'Int' value
+--
+-- >>> eval (IntExpr (AddE (IntE 4) (IntE 5)))
+-- Right 9
 eval :: WrappedExpr -> Either Bool Int
 eval (BoolExpr b) = Left (evalExpr b)
 eval (IntExpr i) = Right (evalExpr i)
@@ -119,6 +106,12 @@ eval (IntExpr i) = Right (evalExpr i)
 
 -- | helps wrapping 'Expr' to the right
 --   'WrappedExpr' constructor
+--
+-- >>> wrap (IntE 42)
+-- IntExpr (IntE 42)
+--
+-- >>> wrap (IsNullE (IntE 42))
+-- BoolExpr (IsNullE (IntE 42))
 class KnownResType a where
   wrap :: Expr a -> WrappedExpr
 

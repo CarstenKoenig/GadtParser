@@ -33,10 +33,17 @@ executables:
 tests:
   spec:
     main:             Spec.hs
-    source-dirs:      test
+    source-dirs:      test/specs
     dependencies:
       - hspec
       - GadtParser
     verbatim:
       build-tool-depends:
         hspec-discover:hspec-discover == 2.*
+
+  doctest:
+    main:              DocTest.hs
+    source-dirs:       test/doctests
+    dependencies:
+      - doctest
+      - doctest-discover

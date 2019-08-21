@@ -1,4 +1,29 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
+
+{-|
+Module      : GADT.Parsing
+Description : "Text.Megaparsec" parser for 'GADT.Internal.Expr' expressions
+Copyright   : (c) Carsten König, 2019
+License     : GPL-3
+Maintainer  : Carsten.Koenig@hotmail.de
+Stability   : experimental
+Portability : POSIX
+
+defines a parser for this syntax:
+
+@
+<expr>        ::= <if-expr> | <term-expr>
+<if-expr>     ::= "if" <bool-expr> "then" <term-expr : a> "else" <term-expr : a>
+<term-expr>   ::= <add-expr> | <value-expr>
+<add-expr>    ::= <int-expr> | <int-expr> "+" <add-expr>
+<value-expr>  ::= <isNull-expr> | "(" <expr> ")" | <number> | <bool>
+<bool-expr>   ::= "(" <expr : Bool> ")" | <isNull-expr> | <bool>
+<isNull-expr> ::= "isNull" <int-expr>
+<int-expr>    ::= "(" <expr : Int> ")" | <number>
+@
+
+-}
+
 module GADT.Parsing 
   ( exprP
   ) where
@@ -11,6 +36,11 @@ import CommonParsers
 import GADT.Internal
 
 
+-- | defines a Megaparsec-Parser for 'WrappedExpr' ended by EOL or EOF
+--
+-- >>> import qualified Text.Megaparsec as P
+-- >>> P.parse exprP "" "3+4"
+-- Right (IntExpr (AddE (IntE 3) (IntE 4)))
 exprP :: Parser WrappedExpr
 exprP = exprP' <* (void PC.eol <|> void P.eof)
 
