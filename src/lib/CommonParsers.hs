@@ -39,7 +39,7 @@ numberP = P.label "number" $ P.hidden $
   read <$> P.some PC.numberChar
 
 
--- | this parser will parse @"true"@ and @"false" into their 'Bool' values
+-- | this parser will parse @"true"@ and @"false"@ into their 'Bool' values
 --
 -- >>> P.parse boolP "" "true" 
 -- Right True
