@@ -24,7 +24,7 @@ defines a parser for this syntax:
 
 -}
 
-module GADT.Parsing 
+module GADT.Parsing
   ( exprP
   ) where
 
